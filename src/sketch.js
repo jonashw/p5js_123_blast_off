@@ -6,14 +6,31 @@ var playing = true;
 var debug = false;
 var cloudA, cloudB;
 var stars;
+var numberSounds;
+var rocketSound;
+var blastOffSound;
+var numbers;
 
 var scenery;
+
+function preload(){
+  rocketSound = loadSound("assets/rocket-burning.mp3");
+  blastOffSound = loadSound("assets/blast-off-1.mp3");
+  numberSounds = new NumberSounds(
+    loadSound("assets/numbers-man-1.mp3"),
+    loadSound("assets/numbers-man-2.mp3"),
+    loadSound("assets/numbers-man-3.mp3"),
+    loadSound("assets/numbers-man-4.mp3"),
+    loadSound("assets/numbers-man-5.mp3"));
+}
 
 function setup() { 
   colorMode(HSL, 255);
   let canvas = createCanvas(windowWidth, windowHeight);
   let w = 125;
   let h = 266;
+
+  rocketSound.loop();
 
   stars = (() => {
     var arr = [];
@@ -28,9 +45,13 @@ function setup() {
     return arr;
   })();
 
+  numbers = [];
   for(var n=1; n<=3; n++){
     let n_s = createSprite((n+1)*windowWidth/6, windowHeight/5, 200,200);
     n_s.addAnimation("normal","assets/number-" + n + ".png");
+    n_s.id = n;
+    numbers.push(n_s);
+    n_s.setCollider('rectangle',0,0,200,200);
   }
   let blast_off = createSprite(windowWidth/2, -windowHeight/4, 200,200);
   blast_off.addAnimation("normal","assets/blast-off.png");
@@ -41,7 +62,7 @@ function setup() {
   platform.position.y = windowHeight - h/2;
   platform.position.x = windowWidth/2;
   platform.addAnimation("normal","assets/platform.png");
-  platform.setCollider('rectangle', 0, 0, platform.width, platform.height);
+  platform.setCollider("rectangle", 0, 0, 215, 72);
 
   rocket = createSprite((windowWidth-w)/2, (windowHeight-h)/2, w, h);
   rocket.addAnimation("normal","assets/rocket.png");
@@ -49,12 +70,13 @@ function setup() {
   rocket.position.x = windowWidth/2;
   rocket.position.y = windowHeight/2;
   rocket.changeAnimation('burning');
-  rocket.setCollider('rectangle', 0, -32, rocket.width, rocket.height - 80);
+  rocket.setCollider("rectangle", 0, -32, w, h - 80);
   yMax = windowHeight - rocket.height/2;
 
   var gradient = [
+    color(138,174,74),
     color(138,174,102),
-    color(138,174,127)
+    color(138,174,127),
   ];
   scenery = [
     new SceneryBand(2*-windowHeight, () => {
@@ -89,12 +111,30 @@ function setup() {
 } 
 
 function touchStarted(){
+  for(var ti=0; ti<touches.length; ti++){
+    let t = touches[ti];
+    for(var i=0; i<numbers.length; i++){
+      let n = numbers[i];
+      if(n.overlapPoint(t.x,t.y)){
+        numberSounds[n.id].play();
+      }
+    }
+  }
   return false; // This is to prevent pinch-zooming on touch devices.
 }
 
 function keyPressed(){
   if(key == 'D'){
     debug = !debug;
+    for(var i=0;i<allSprites.length;i++){
+      allSprites[i].debug = debug;
+    }
+  }
+  if(key == 'B'){
+    blastOffSound.play();
+  }
+  if(key in numberSounds){
+    numberSounds[key].play();
   }
   if(keyCode == ESCAPE){
     playing = !playing;
@@ -123,15 +163,18 @@ function draw() {
       pop();
     }
   }
-  rocket.debug = platform.debug = debug;
   if(rocket.position.y <= windowHeight - rocket.height/2){
     rocket.velocity.y += 0.3;
   }
   if(keyIsDown(UP_ARROW) || keyIsDown(32) || mouseIsPressed){
     rocket.changeAnimation("burning");
     rocket.velocity.y -= 0.5;
+    if(!rocketSound.isPlaying()){
+      rocketSound.play();
+    }
   } else {
     rocket.changeAnimation("normal");
+    rocketSound.stop();
   }
   //rocket.position.y = min(rocket.position.y, yMax);
   camera.position.y = 
@@ -140,7 +183,6 @@ function draw() {
       max(rocket.position.y, yMin));
   rocket.limitSpeed(10);
   rocket.collide(platform);
-
 
   push();
   drawSprites();
@@ -168,4 +210,12 @@ function windowResized() {
 function SceneryBand(yOffset, draw){
   this.yOffset = yOffset;
   this.draw = draw;
+}
+
+function NumberSounds(_1,_2,_3,_4,_5){
+  this[1] = _1;
+  this[2] = _2;
+  this[3] = _3;
+  this[4] = _4;
+  this[5] = _5;
 }
