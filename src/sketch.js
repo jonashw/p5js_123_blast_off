@@ -1,7 +1,7 @@
 var rocket;
 var platform;
-var yMin = -1 * 1080 * 3;
-var yMax = 1080;
+var yMin;
+var yMax;
 var playing = true;
 var debug = false;
 var cloudA, cloudB;
@@ -10,6 +10,10 @@ var numberSounds;
 var rocketSound;
 var blastOffSound;
 var numbers;
+var spriteScale = 0.5;
+var rocketMode = false;
+var rocketOn = false;
+var blastOffSign;
 
 var scenery;
 
@@ -37,8 +41,9 @@ function setup() {
     for(var i=0; i<50; i++){
       let s = createSprite(
         random(0,windowWidth),
-        random(0,windowHeight - 50) - 4*windowHeight, 50, 50);
+        random(0,windowHeight - 50) - 4*windowHeight, 50/spriteScale, 50/spriteScale);
       let a = s.addAnimation("twinkle","assets/star-01.png", "assets/star-04.png");
+      s.scale = spriteScale;
       a.changeFrame(i % a.images.length);
       arr.push(s);
     }
@@ -47,14 +52,22 @@ function setup() {
 
   numbers = [];
   for(var n=1; n<=3; n++){
-    let n_s = createSprite((n+1)*windowWidth/6, windowHeight/5, 200,200);
-    n_s.addAnimation("normal","assets/number-" + n + ".png");
+    let n_s = createSprite((n+1)*windowWidth/6, windowHeight/5, 200/spriteScale,200/spriteScale);
+    n_s.addAnimation("normal", "assets/number-" + n + "-normal.png");
+    n_s.addAnimation("dancing",
+      "assets/number-" + n + "-1.png", "assets/number-" + n + "-2.png",
+      "assets/number-" + n + "-3.png", "assets/number-" + n + "-4.png",
+      "assets/number-" + n + "-5.png", "assets/number-" + n + "-6.png",
+      "assets/number-" + n + "-7.png", "assets/number-" + n + "-8.png"
+    );
     n_s.id = n;
     numbers.push(n_s);
-    n_s.setCollider('rectangle',0,0,200,200);
+    /* We have to make the collider box larger and offset below the image due to an apparent bug in `overlapsPoint`. */
+    n_s.setCollider('rectangle',0,100,200/spriteScale,200/spriteScale + 100 );
+    n_s.scale = spriteScale;
   }
-  let blast_off = createSprite(windowWidth/2, -windowHeight/4, 200,200);
-  blast_off.addAnimation("normal","assets/blast-off.png");
+  blastOffSign = createSprite(windowWidth/2, -windowHeight/4, 200,200);
+  blastOffSign.addAnimation("normal","assets/blast-off.png");
 
   cloudA = loadImage('assets/cloud-a.png');
   cloudB = loadImage('assets/cloud-b.png');
@@ -64,13 +77,15 @@ function setup() {
   platform.addAnimation("normal","assets/platform.png");
   platform.setCollider("rectangle", 0, 0, 215, 72);
 
-  rocket = createSprite((windowWidth-w)/2, (windowHeight-h)/2, w, h);
-  rocket.addAnimation("normal","assets/rocket.png");
+  let rocketScale = 0.5;
+  rocket = createSprite((windowWidth-w)/2, (windowHeight-h)/2, w/rocketScale, h/rocketScale);
+  rocket.scale = rocketScale;
+  rocket.addAnimation("normal","assets/rocket-normal.png");
   rocket.addAnimation("burning","assets/rocket-burning-01.png","assets/rocket-burning-06.png");
   rocket.position.x = windowWidth/2;
   rocket.position.y = windowHeight/2;
   rocket.changeAnimation('burning');
-  rocket.setCollider("rectangle", 0, -32, w, h - 80);
+  rocket.setCollider("rectangle", 0, -60*rocketScale, w/rocketScale, (h - 80)/rocketScale);
   yMax = windowHeight - rocket.height/2;
 
   var gradient = [
@@ -108,30 +123,62 @@ function setup() {
       rect(0,0,windowWidth,windowHeight);
     })
   ];
+  yMin = -1 * windowHeight * (scenery.length);
+  yMax = windowHeight;
+  //toggleDebug();
 } 
 
 function touchStarted(){
   for(var ti=0; ti<touches.length; ti++){
     let t = touches[ti];
-    for(var i=0; i<numbers.length; i++){
-      let n = numbers[i];
-      if(n.overlapPoint(t.x,t.y)){
-        numberSounds[n.id].play();
-      }
-    }
+    handlePointAction(t.x,t.y);
   }
   return false; // This is to prevent pinch-zooming on touch devices.
 }
 
+function mousePressed(){
+  handlePointAction(mouseX,mouseY);
+}
+
+function handlePointAction(x,y){
+  for(var i=0; i<numbers.length; i++){
+    let n = numbers[i];
+    if(n.overlapPoint(x,y)){
+      let previousNumbers = numbers.slice(0, n.id-1);
+      if(previousNumbers.length == 0 || previousNumbers.every(pn => pn.touched)){
+        n.changeAnimation("dancing");
+        numberSounds[n.id].play();
+        n.touched = true;
+        if(n.id == numbers.length){
+          rocketMode = true;
+          //setTimeout(() => blastOffSound.play(), 1000);
+        }
+      }
+    }
+  }
+  if(rocketMode){
+    rocketOn = !rocketOn;
+  }
+}
+
+function reset(){
+  numbers.forEach(n => {
+    n.touched = false;
+    n.changeAnimation("normal");
+  });
+  rocketOn = false;
+  rocketMode = false;
+}
+
 function keyPressed(){
   if(key == 'D'){
-    debug = !debug;
-    for(var i=0;i<allSprites.length;i++){
-      allSprites[i].debug = debug;
-    }
+    toggleDebug();
   }
   if(key == 'B'){
     blastOffSound.play();
+  }
+  if(key == 'R'){
+    reset();
   }
   if(key in numberSounds){
     numberSounds[key].play();
@@ -146,6 +193,13 @@ function keyPressed(){
   }
 }
 
+function toggleDebug(){
+    debug = !debug;
+    for(var i=0;i<allSprites.length;i++){
+      allSprites[i].debug = debug;
+    }
+}
+
 function draw() { 
   background(138,174,152);
   for(var i=0; i<scenery.length; i++){
@@ -153,7 +207,7 @@ function draw() {
     //console.log(s.yOffset, camera.position.y);
     if(s.yOffset + windowHeight >= camera.position.y - windowHeight/2
     && s.yOffset <= camera.position.y + windowHeight/2){
-      console.log('draw ' + i);
+      //console.log('draw ' + i);
       push();
       translate(0,s.yOffset);
       if(debug){
@@ -166,7 +220,7 @@ function draw() {
   if(rocket.position.y <= windowHeight - rocket.height/2){
     rocket.velocity.y += 0.3;
   }
-  if(keyIsDown(UP_ARROW) || keyIsDown(32) || mouseIsPressed){
+  if(rocketMode && rocketOn/*&& (keyIsDown(UP_ARROW) || keyIsDown(32) || mouseIsPressed)*/){
     rocket.changeAnimation("burning");
     rocket.velocity.y -= 0.5;
     if(!rocketSound.isPlaying()){
@@ -181,8 +235,23 @@ function draw() {
     min(
       windowHeight/2-100,
       max(rocket.position.y, yMin));
+
+  if(rocket.position.y < yMin){
+    let v = max(
+      0,
+      (windowHeight - abs(rocket.position.y - yMin))/windowHeight);
+    rocketSound.setVolume(v);
+    console.log(yMin, rocket.position.y, v);
+  }
+
   rocket.limitSpeed(10);
   rocket.collide(platform);
+  rocket.overlap(blastOffSign, () => {
+    if(blastOffSound.isPlaying() || !rocketOn){
+      return;
+    }
+    blastOffSound.play();
+  })
 
   push();
   drawSprites();
