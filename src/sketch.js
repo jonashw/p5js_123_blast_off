@@ -168,6 +168,8 @@ function reset(){
   });
   rocketOn = false;
   rocketMode = false;
+  rocketSound.stop();
+  rocketSound.setVolume(1);
 }
 
 function keyPressed(){
@@ -241,7 +243,9 @@ function draw() {
       0,
       (windowHeight - abs(rocket.position.y - yMin))/windowHeight);
     rocketSound.setVolume(v);
-    console.log(yMin, rocket.position.y, v);
+    if(v == 0){
+      reset();
+    }
   }
 
   rocket.limitSpeed(10);
