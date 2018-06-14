@@ -1,6 +1,6 @@
 $INKSCAPE = "`"C:\Program Files\Inkscape\inkscape.exe`""
 $width = 400
-$numbers = "1", "2", "3"
+$numbers = "1", "2", "3", "4", "5"
 
 foreach($n in $numbers){
 	$id = "number-$($n)-normal"

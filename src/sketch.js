@@ -14,6 +14,9 @@ var spriteScale = 0.5;
 var rocketMode = false;
 var rocketOn = false;
 var blastOffSign;
+var byeBye;
+var bonk;
+var lastRocketY;
 
 var scenery;
 
@@ -26,6 +29,35 @@ function preload(){
     loadSound("assets/numbers-man-3.mp3"),
     loadSound("assets/numbers-man-4.mp3"),
     loadSound("assets/numbers-man-5.mp3"));
+  bonk = loadSound("assets/bonk.mp3");
+  byeBye = loadSound("assets/byeBye.mp3");
+}
+
+function destroyNumbers(){
+  if(!numbers){
+    return;
+  }
+  numbers.forEach(n => n.remove());
+  numbers = [];
+}
+
+function setupNumbers(nMax){
+  numbers = [];
+  for(var n=1; n<=nMax; n++){
+    let n_s = createSprite(n*windowWidth/(nMax+1), windowHeight/5, 200/spriteScale,200/spriteScale);
+    n_s.addAnimation("normal", "assets/number-" + n + "-normal.png");
+    n_s.addAnimation("dancing",
+      "assets/number-" + n + "-1.png", "assets/number-" + n + "-2.png",
+      "assets/number-" + n + "-3.png", "assets/number-" + n + "-4.png",
+      "assets/number-" + n + "-5.png", "assets/number-" + n + "-6.png",
+      "assets/number-" + n + "-7.png", "assets/number-" + n + "-8.png"
+    );
+    n_s.id = n;
+    numbers.push(n_s);
+    /* We have to make the collider box larger and offset below the image due to an apparent bug in `overlapsPoint`. */
+    n_s.setCollider('rectangle',0,100,200/spriteScale,200/spriteScale + 100 );
+    n_s.scale = spriteScale;
+  }
 }
 
 function setup() { 
@@ -50,22 +82,7 @@ function setup() {
     return arr;
   })();
 
-  numbers = [];
-  for(var n=1; n<=3; n++){
-    let n_s = createSprite((n+1)*windowWidth/6, windowHeight/5, 200/spriteScale,200/spriteScale);
-    n_s.addAnimation("normal", "assets/number-" + n + "-normal.png");
-    n_s.addAnimation("dancing",
-      "assets/number-" + n + "-1.png", "assets/number-" + n + "-2.png",
-      "assets/number-" + n + "-3.png", "assets/number-" + n + "-4.png",
-      "assets/number-" + n + "-5.png", "assets/number-" + n + "-6.png",
-      "assets/number-" + n + "-7.png", "assets/number-" + n + "-8.png"
-    );
-    n_s.id = n;
-    numbers.push(n_s);
-    /* We have to make the collider box larger and offset below the image due to an apparent bug in `overlapsPoint`. */
-    n_s.setCollider('rectangle',0,100,200/spriteScale,200/spriteScale + 100 );
-    n_s.scale = spriteScale;
-  }
+  setupNumbers(3);
   blastOffSign = createSprite(windowWidth/2, -windowHeight/4, 200,200);
   blastOffSign.addAnimation("normal","assets/blast-off.png");
 
@@ -83,7 +100,7 @@ function setup() {
   rocket.addAnimation("normal","assets/rocket-normal.png");
   rocket.addAnimation("burning","assets/rocket-burning-01.png","assets/rocket-burning-06.png");
   rocket.position.x = windowWidth/2;
-  rocket.position.y = windowHeight/2;
+  rocket.position.y = lastRocketY = windowHeight/2;
   rocket.changeAnimation('burning');
   rocket.setCollider("rectangle", 0, -60*rocketScale, w/rocketScale, (h - 80)/rocketScale);
   yMax = windowHeight - rocket.height/2;
@@ -150,8 +167,11 @@ function handlePointAction(x,y){
         numberSounds[n.id].play();
         n.touched = true;
         if(n.id == numbers.length){
-          rocketMode = true;
-          //setTimeout(() => blastOffSound.play(), 1000);
+          // Let's give some time for the final number sound to play before blast .
+          setTimeout(() => {
+            rocketMode = true;
+            rocketOn = true;
+          }, 500);
         }
       }
     }
@@ -182,7 +202,10 @@ function keyPressed(){
   if(key == 'R'){
     reset();
   }
-  if(key in numberSounds){
+  let n = parseInt(key);
+  if(n && 1 <= n && n <= 5){
+    destroyNumbers();
+    setupNumbers(n);
     numberSounds[key].play();
   }
   if(keyCode == ESCAPE){
@@ -244,12 +267,21 @@ function draw() {
       (windowHeight - abs(rocket.position.y - yMin))/windowHeight);
     rocketSound.setVolume(v);
     if(v == 0){
+      if(rocketMode){
+        byeBye.play();
+      }
       reset();
     }
   }
 
   rocket.limitSpeed(10);
-  rocket.collide(platform);
+
+  rocket.collide(platform, function(){
+    if(rocket.position.y - lastRocketY > 0){
+      bonk.play();
+    }
+  });
+  lastRocketY = rocket.position.y;
   rocket.overlap(blastOffSign, () => {
     if(blastOffSound.isPlaying() || !rocketOn){
       return;
