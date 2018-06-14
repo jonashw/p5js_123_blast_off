@@ -30,7 +30,7 @@ function preload(){
     loadSound("assets/numbers-man-4.mp3"),
     loadSound("assets/numbers-man-5.mp3"));
   bonk = loadSound("assets/bonk.mp3");
-  byeBye = loadSound("assets/byeBye.mp3");
+  byeBye = loadSound("assets/byebye.mp3");
 }
 
 function destroyNumbers(){
